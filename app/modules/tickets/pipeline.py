@@ -4,6 +4,7 @@ from time import perf_counter
 from app.canonical import manifest
 from app.errors import DomainError
 from app.modules.barcode.service import compare
+from app.modules.billing.service import bill
 from app.modules.coordinates.service import calibrate
 from app.modules.intake.service import receive
 from app.modules.occlusion.service import check
@@ -32,6 +33,10 @@ def run(sources):
     balance = reconcile(intake, tickets, parcels)
     if not balance['ok']:
         raise DomainError('ACCOUNT_MISMATCH', 409)
+    billing = bill(intake, tickets, balance)
+    if not billing['ok']:
+        raise DomainError('BILLING_MISMATCH', 409,
+                          checks=[check['code'] for check in billing['checks'] if not check['ok']])
     return {'manifest': manifest(sources, round((perf_counter() - begin) * 1000, 3)), 'intake': intake,
             'templates': templates, 'coordinates': coordinates, 'barcode': barcode,
-            'occlusion': occlusion, 'reconcile': balance, 'tickets': tickets}
+            'occlusion': occlusion, 'reconcile': balance, 'tickets': tickets, 'billing': billing}

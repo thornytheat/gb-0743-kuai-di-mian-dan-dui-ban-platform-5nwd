@@ -14,6 +14,7 @@
 | M5 边界遮挡 | 筛选静区、版位和相交面积 | `GET /api/occlusion` | `app/modules/occlusion/rules.py` `app/modules/occlusion/service.py` | `tests/test_occlusion.py` |
 | M6 出单勾稽 | 清点输入、结果与包裹可发资格 | `GET /api/reconcile` | `app/modules/reconcile/service.py` | `tests/test_reconcile.py` |
 | M7 重打工单 | 作废、重打、复算与回切旧批次 | `GET /api/tickets` `POST /api/tickets/void` `POST /api/tickets/reprint` `GET /api/runs/<run_id>/evidence.json` | `app/modules/tickets/ledger.py` `app/modules/tickets/service.py` `app/store.py` | `tests/test_tickets.py` |
+| M8 费用对账 | 逐张认定承运商用量、折让、暂缓并交班导出 | `GET /api/billing` `GET /api/billing/statement.csv` | `app/modules/billing/service.py` `app/modules/billing/handler.py` | `tests/test_billing.py` |
 
 ## 陷阱登记
 
@@ -32,9 +33,21 @@
 | TRAP-23 | `L-019`、`L-021` 卡在版本起止点 | 双绑定或不绑定 | 区间左闭右开 | `app/modules/templates/service.py` | `tests/test_templates.py::test_half_open_boundaries_choose_new_revision_then_fall_back` |
 | TRAP-25 | `templates.jsonl` 两条修订 3 重叠 | 选择任意一条 | 冲突版本隔离，剩余取最高修订号 | `app/modules/templates/versions.py` | `tests/test_templates.py::test_same_revision_overlap_is_quarantined_without_losing_older_versions` |
 | TRAP-26 | 旧批次页面继续登记作废 | 已发布批次被覆盖 | 事务内核对当前批次编号 | `app/store.py` | `tests/test_tickets.py::test_void_new_version_rejects_stale_write_and_restores_original` |
+| TRAP-27 | 承运商按打印张数、财务只认有效面单 | 折让纸单和隔离纸单被算成应付 | 每张纸单同时记 `carrier_counts` 与 `finance_pays`，折让单不计入应付 | `app/modules/billing/service.py` | `tests/test_billing.py::test_broken_reprint_is_allowance_for_carrier_but_not_payable` |
+| TRAP-28 | 同一面单号的迟到重复回执 | 重复计入承运商用量 | 精确重复只留一行，另一行记入 `ignored` 不生成纸单 | `app/modules/billing/service.py` | `tests/test_billing.py::test_duplicate_receipt_and_blank_line_never_count_twice` |
+| TRAP-29 | 作废后包裹另挂了一张可发单 | 作废单与后继、包裹状态对不上 | 沿 `replaced_by` 走到终态，核对终态可发面单与包裹当前可发 | `app/modules/billing/service.py` | `tests/test_billing.py::test_revoked_sheet_with_extra_live_sheet_is_flagged` |
+| TRAP-30 | 重跑与迟到回执重放 | 二次累计或静默换掉旧对账 | 同内容只归档一次且复算逐字段比对，不一致拒绝覆盖 | `app/store.py` | `tests/test_billing.py::test_late_duplicate_receipt_rerun_does_not_accumulate` |
 
 ## 对账规则
 
 - 每条出单输入归入有效、撤销或隔离。空白、坏行、采信重复均计入隔离。
 - 包裹最多有一张有效面单；历史作废仍保留前后继和作废登记。作废登记另外勾稽，不计入出单数。
 - 面单物理检测与工单资格各保留自己的依据，几何有问题的回执不进入可发链。
+
+## 费用对账规则
+
+- 每张纸单只落一个归类：有效面单 `usage`、作废与隔离面单 `allowance`、同号矛盾和不可读行 `deferred`。
+- 承运商用量 = `usage` + `allowance`，财务应付只认 `usage`，两者之差即折让；三项张数必须与纸单总数闭合。
+- 输入行全部落账：纸单行、精确重复回执行、空白行分别计数，合计等于输入行数。
+- 作废链保留作废单原始回执、作废登记原值、后继及终态、包裹当前可发面单，任一段缺失或终态不可发即判定接续异常。
+- 对账不闭合时整批拒绝归档，旧批次、旧对账和原始回执保持不变。

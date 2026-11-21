@@ -1,6 +1,6 @@
-import {$, clock, command, explanation, facts, field, fillSelection, summary, table} from './dom.js';
+import {$, clock, command, detail, element, explanation, facts, field, fillSelection, summary, table} from './dom.js';
 
-const states = {valid:'可发', revoked:'作废', isolated:'隔离'};
+const states = {valid:'可发', revoked:'作废', isolated:'隔离', conflict:'回执矛盾', unreadable:'不可读'};
 const rejectRows = rows => rows.map(row => [row.line, row.code, explanation(row.code), row.raw]);
 const rejectHeaders = ['源行','原因码','判定','原始记录'];
 
@@ -53,6 +53,49 @@ export function reconcile(data) {
   const filter = $('parcel-filter').value;
   table('parcel-table',['包裹','有效','撤销','隔离','可发面单'],data.parcels.filter(row => filter === 'all' || Boolean(row.valid) === (filter === 'ready')).map(row =>
     [row.parcel,row.valid,row.revoked,row.isolated,row.live_labels.join(' / ') || '—']),'没有匹配包裹');
+}
+
+const dispositions = {usage:['承运商用量','ok'], allowance:['折让','warn'], deferred:['暂缓','bad']};
+const chainPath = row => row.links.length ? row.links.map((step, index) =>
+  `${index ? '→ ' : ''}${step.from} → ${step.to}（${states[step.state] || '未知'}）`).join('\n') : `${row.voided} → 未重打`;
+
+export function billing(data, meta) {
+  const totals = data.totals;
+  summary([['纸单张数',totals.sheets,'张'],['承运商用量',totals.carrier_billed,'张'],
+    ['财务应付',totals.finance_payable,'张','ok'],['折让',totals.credit_claim,'张','warn'],['暂缓',totals.deferred,'张','bad']]);
+  facts('billing-totals',[['输入行',totals.input_rows],['已落账张',totals.accounted_rows,'ok'],
+    ['重复回执行',totals.duplicate_rows,'warn'],['空白行',totals.blank_rows],['逐张归类',data.ok?'相符':'异常',data.ok?'ok':'bad']]);
+  table('billing-checks',['核验项','结果','说明'],data.checks.map(row =>
+    [explanation(row.code),row.ok?'通过':'异常',row.detail]),'无核验项');
+  $('billing-export').href = `/api/billing/statement.csv?run=${encodeURIComponent(meta.manifest.id)}`;
+
+  const filter = $('billing-filter').value;
+  const rows = data.sheets.filter(row => filter === 'all' || (filter === 'issues' ? row.issues.length : row.disposition === filter));
+  const cellText = row => [row.receipts, row.duplicates].flat().map(item => `#${item.line} ${item.raw}`).join('\n');
+  table('billing-table',['纸单','包裹','状态','归类','依据','源行','原始回执','作废登记','旧单','后继','包裹当前可发','接续问题'],rows.map(row => {
+    const [name,tone] = dispositions[row.disposition];
+    return [
+      row.label || '（无面单号）', row.parcel || '—', states[row.state] || row.state,
+      element('span', name, tone), explanation(row.reason), row.lines.join(' / '),
+      detail(cellText(row), '原始回执'), row.void ? `${row.void.id} · ${explanation(row.void.reason)}` : '—',
+      row.predecessor || '—', row.successor || '—',
+      row.parcel_state.live_labels.join(' / ') || '无可发',
+      row.issues.length ? row.issues.map(explanation).join('；') : '—',
+    ];
+  }), '没有匹配纸单');
+
+  table('billing-chains',['作废单','包裹','作废原因','重打链','后继状态','包裹当前可发','接续','原始回执与作废登记'],data.chains.map(row => [
+    row.voided, row.parcel, explanation(row.void.reason), detail(chainPath(row), '作废前后'),
+    row.successor_state ? (states[row.successor_state] || row.successor_state) : '—',
+    row.parcel_state.live_labels.join(' / ') || '无可发',
+    element('span', row.consistent ? '一致' : row.issues.map(explanation).join('；'), row.consistent ? 'ok' : 'bad'),
+    detail([`作废登记 #${row.void.line} ${row.void.raw}`, ...row.voided_receipts.map(item => `作废单 #${item.line} ${item.raw}`),
+      ...row.links.flatMap(step => step.to_receipts.map(item => `后继 #${item.line} ${item.raw}`))].join('\n'), '查看回执'),
+  ]), '没有作废单');
+
+  table('billing-ignored',['源行','类型','关联纸单','原始回执'],data.ignored.map(row => [
+    row.line, row.kind === 'blank' ? '空白行' : '重复回执', row.sheet ? row.sheet.replace('label:','') : '—',
+    detail(row.raw || '（空行）','原始回执')]), '没有额外输入行');
 }
 
 export function ticketForm(data, active) {

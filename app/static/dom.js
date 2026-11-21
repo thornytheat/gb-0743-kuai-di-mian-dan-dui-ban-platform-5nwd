@@ -31,6 +31,22 @@ export function command(text, invoke) {
   return button;
 }
 
+export function detail(text, label = '查看详情') {
+  const wrapper = element('span', '', 'detail');
+  const button = element('button', label, 'text-btn');
+  button.type = 'button';
+  button.title = text;
+  const body = element('pre', text, 'detail-body');
+  body.hidden = true;
+  button.addEventListener('click', () => {
+    body.hidden = !body.hidden;
+    button.textContent = body.hidden ? label : '收起';
+    button.closest('td')?.classList.toggle('open', !body.hidden);
+  });
+  wrapper.append(button, body);
+  return wrapper;
+}
+
 export function hint(text = '', problem = false, reload = false) {
   $('notice').hidden = !text;
   $('notice').classList.toggle('error', problem);

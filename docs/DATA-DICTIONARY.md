@@ -36,3 +36,20 @@
 | `POST /api/runs/restore` | JSON 的 `expected`、`target` |
 
 `expected` 为当前完整批次编号。七阶段 API 用 `?run=<编号>` 读取任一已归档批次。批次编号由规则版本、原始输入字节数和 SHA-256 计算。同样内容只归档一次，重跑校验业务证据且保留首次时间和耗时。证据包的 `sha256` 针对外层 `evidence` 对象，计算前按键名排序，序列化为紧凑 UTF-8 JSON，保留中文原字符。
+
+## 费用对账
+
+`GET /api/billing` 逐张列出纸单归类，`GET /api/billing/statement.csv` 导出同一份明细（UTF-8 BOM，Excel 可直接打开）。每张纸单的 `disposition` 只有三种：
+
+| 归类 | 判定 | 承运商计纸 | 财务付款 | `reason` |
+|---|---|---|---|---|
+| `usage` 用量 | 当前可发运的有效面单 | 是 | 是 | `BILL_USAGE` |
+| `allowance` 折让 | 已作废、被隔离或重打未成单的纸单 | 是 | 否 | `BILL_VOIDED`、`BILL_REJECTED`、`BILL_REPRINT_REJECTED` |
+| `deferred` 暂缓 | 同号回执矛盾、回执不可读，无法认定 | 否 | 否 | `BILL_CONFLICT`、`BILL_UNREADABLE` |
+
+- `carrier_counts` 与 `finance_pays` 必须与归类一致，`claim_credit` 标出需要向承运商冲减的张数。
+- 精确重复回执不生成纸单，记入 `ignored`（`kind=duplicate_receipt`）并附回 `sheet`；空白行记入 `ignored`（`kind=blank`）。
+- `receipts` 保留每张纸单的源行号和原始回执文本，`duplicates` 列出该面单号的重复回执行。
+- `totals.accounted_rows + duplicate_rows + blank_rows == input_rows`；`carrier_billed == finance_payable + credit_claim`。
+- `chains` 按作废时点列出 `voided`（作废单）、`void`（作废登记原值）、`links`（逐段接续及其原始回执）、`terminal`（重打终态）、`parcel_state.live_labels`（包裹当前可发面单）。`issues` 为空才表示作废前后与包裹状态一致。
+- `checks` 全部通过时 `ok` 为真；不闭合的批次拒绝归档，接口返回 409 `BILLING_MISMATCH`。规则版本早于费用对账的旧批次返回 409 `BILLING_NOT_ARCHIVED`，重跑后会生成带对账的新批次。

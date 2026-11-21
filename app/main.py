@@ -7,6 +7,7 @@ from werkzeug.exceptions import RequestEntityTooLarge
 from .config import MAX_BYTES
 from .errors import DomainError
 from .modules.barcode.handler import bp as barcode
+from .modules.billing.handler import bp as billing
 from .modules.coordinates.handler import bp as coordinates
 from .modules.intake.handler import bp as intake
 from .modules.occlusion.handler import bp as occlusion
@@ -25,7 +26,7 @@ def create_app(path=None):
     db = Store(path or os.getenv('LABEL_DB', 'var/labels.sqlite3'))
     app.extensions['batch_store'] = db
     seed(db)
-    for blueprint in (intake, templates, coordinates, barcode, occlusion, reconcile, tickets):
+    for blueprint in (intake, templates, coordinates, barcode, occlusion, reconcile, tickets, billing):
         app.register_blueprint(blueprint)
 
     @app.errorhandler(DomainError)

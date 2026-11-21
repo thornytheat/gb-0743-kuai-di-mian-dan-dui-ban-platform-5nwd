@@ -1,0 +1,8 @@
+<div class="stage" id="stage-billing" hidden>
+  <section class="panel"><div class="panel-head"><h2>承运商与财务口径</h2><a class="btn" id="billing-export" download>下载逐张对账 CSV</a></div>
+    <div id="billing-totals" class="fact-grid"></div><div id="billing-checks" class="scroll short"></div>
+  </section>
+  <section class="panel"><div class="panel-head"><h2>逐张纸单归类</h2><label>显示 <select id="billing-filter"><option value="all">全部纸单</option><option value="usage">承运商用量</option><option value="allowance">折让</option><option value="deferred">暂缓</option><option value="issues">接续异常</option></select></label></div><div id="billing-table" class="scroll"></div></section>
+  <section class="panel"><div class="panel-head"><h2>作废前后接续</h2><span class="dim">作废单 · 作废登记 · 后继 · 包裹当前状态 · 原始回执</span></div><div id="billing-chains" class="scroll"></div></section>
+  <section class="panel"><div class="panel-head"><h2>未计入纸单的输入行</h2><span class="dim">重复回执与空白行，仅留底不重复计费</span></div><div id="billing-ignored" class="scroll short"></div></section>
+</div>

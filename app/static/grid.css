@@ -67,3 +67,7 @@ tbody tr:hover td { background: var(--panel-2); }
 .fact { padding: 5px 7px; border: 1px solid var(--line); background: var(--panel-2); }
 .fact span { display: block; }
 .fact strong { font-size: 17px; }
+.detail { display: grid; gap: 3px; }
+.detail-body { margin: 0; padding: 4px 6px; max-width: 420px; max-height: 160px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--panel-2); border: 1px solid var(--line); font: 10px/1.45 var(--mono); color: var(--ink-2); }
+td.open { white-space: normal; height: auto; }
+td.open .detail-body { max-width: none; }

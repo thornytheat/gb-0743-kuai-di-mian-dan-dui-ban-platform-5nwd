@@ -33,6 +33,7 @@ function draw() {
   if (stage === 'coordinates') coordinates(data, extra, anchor, id => { anchor = id; draw(); });
   else if (stage === 'occlusion') views.occlusion(data, id => { anchor = id; location.hash = 'coordinates'; });
   else if (stage === 'tickets') { views.tickets(data, info, id => load(id)); chooseTarget(); }
+  else if (stage === 'billing') views.billing(data, info);
   else views[stage](data);
 }
 
@@ -95,7 +96,7 @@ async function mutate(url, params, done) {
 }
 
 window.addEventListener('hashchange', () => { if (location.hash !== '#main') load(); });
-for (const id of ['intake-filter','template-filter','barcode-filter','occlusion-filter','parcel-filter','ticket-filter','void-filter']) $(id).addEventListener('change', draw);
+for (const id of ['intake-filter','template-filter','barcode-filter','occlusion-filter','parcel-filter','ticket-filter','void-filter','billing-filter']) $(id).addEventListener('change', draw);
 $('coord-label').addEventListener('change', () => { anchor = $('coord-label').value; draw(); });
 $('reload').addEventListener('click', () => load(null));
 $('rerun').addEventListener('click', () => mutate('/api/runs/rerun',{expected:run()}, () => hint('复算完成 · 沿用原批次')));
